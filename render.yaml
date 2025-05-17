@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: flask-crm
+    env: python
+    buildCommand: ""
+    startCommand: gunicorn Flask-app:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
