@@ -233,7 +233,7 @@ def get_users_with_messages():
 
 
 app = Flask(__name__)
-app.secret_key = "r@nd0mSk_1"
+app.secret_key = "IT-service"
 
 @app.route("/")
 def index():
