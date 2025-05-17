@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Регистрация</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        html, body {
+            height: 100%;
+        }
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .custom-input {
+            width: 230px;
+        }
+        #togglePassword:focus {
+            box-shadow: none;
+        }
+        #admin-key-group {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+            <div class="alert-container mb-4">
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show text-center" role="alert">
+                        {{ message }}
+                        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Закрыть"></button>
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+        {% endwith %}
+
+        <form method="post" action="{{ url_for('register') }}" class="text-center">
+            <h1 class="mb-4">Регистрация</h1>
+
+            <div class="mb-3">
+                <label for="username" class="form-label">Логин</label>
+                <input type="text" class="form-control custom-input mx-auto" id="username" name="username" minlength="4" maxlength="20" required>
+            </div>
+
+            <div class="mb-3 position-relative">
+                <label for="password" class="form-label">Пароль</label>
+                <div class="input-group custom-input mx-auto">
+                    <input type="password" class="form-control" id="password" name="password" minlength="4" maxlength="20" required>
+                    <button type="button" class="btn btn-outline-primary" id="togglePassword">
+                        <i class="bi bi-eye" id="eyeIcon"></i>
+                    </button>
+                </div>
+            </div>
+
+            <div class="mb-3">
+                <label for="role" class="form-label">Роль</label>
+                <select class="form-select custom-input mx-auto" id="role" name="role" required>
+                    <option value="user">Пользователь</option>
+                    <option value="admin">Администратор</option>
+                </select>
+            </div>
+
+            <div class="mb-3" id="admin-key-group">
+                <label for="admin_key" class="form-label">Ключ администратора</label>
+                <input type="password" class="form-control custom-input mx-auto" id="admin_key" name="admin_key" minlength="4" maxlength="20">
+            </div>
+
+            <button type="submit" class="btn btn-primary d-block mx-auto">Зарегистрироваться</button>
+
+            <div class="mt-3">
+                <p>Уже зарегистрированы? <a href="{{ url_for('login') }}" class="btn btn-link">Войти</a></p>
+            </div>
+        </form>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const togglePassword = document.getElementById('togglePassword');
+        const passwordInput = document.getElementById('password');
+        const eyeIcon = document.getElementById('eyeIcon');
+
+        togglePassword.addEventListener('click', () => {
+            const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+            passwordInput.setAttribute('type', type);
+            eyeIcon.classList.toggle('bi-eye');
+            eyeIcon.classList.toggle('bi-eye-slash');
+        });
+
+        const roleSelect = document.getElementById('role');
+        const adminKeyGroup = document.getElementById('admin-key-group');
+        const adminKeyInput = document.getElementById('admin_key');
+
+        roleSelect.addEventListener('change', () => {
+            if (roleSelect.value === 'admin') {
+                adminKeyGroup.style.display = 'block';
+                adminKeyInput.setAttribute('required', 'required');
+            } else {
+                adminKeyGroup.style.display = 'none';
+                adminKeyInput.removeAttribute('required');
+            }
+        });
+    </script>
+</body>
+</html>
