@@ -323,9 +323,9 @@ def track_status_changes():
             if old_status and old_status != new_status:
                 admin_name = order.get('admin_name')
                 if new_status == get_status_id_by_name("Принята"):
-                    flash(f"Ваша заявка №{oid} была принята ({admin_name})", "success")
+                    flash(f"Ваша заявка №{oid} была принята ({admin_name})", "info")
                 elif new_status == get_status_id_by_name("Отклонена"):
-                    flash(f"Ваша заявка №{oid} была отклонена ({admin_name})", "danger")
+                    flash(f"Ваша заявка №{oid} была отклонена ({admin_name})", "info")
 
         session['status_cache'] = {o['id_orders']: o['status_id'] for o in current}
 
