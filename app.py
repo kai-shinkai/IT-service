@@ -321,7 +321,7 @@ def profile():
             prev = previous_statuses.get(order['id_orders'])
             now = order['status_id']
             if prev and prev != now:
-                admin = order['admin_name'] or "Администратор"
+                admin = order['admin'] or "Администратор"
                 if now == get_status_id_by_name("Принята"):
                     flash(f"Ваша заявка №{order['id_orders']} была принята : ({admin})", "success")
                 elif now == get_status_id_by_name("Отклонена"):
