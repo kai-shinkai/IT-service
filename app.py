@@ -220,18 +220,15 @@ def get_conversation(user_id):
         """, (user_id, user_id))
         return cursor.fetchall()
     
-def get_user_status_changes(id_user):
+def get_user_status_changes(user_id):
     with connect_to_database() as db:
         cursor = db.cursor(dictionary=True)
         cursor.execute("""
-            SELECT 
-                o.id_orders, 
-                o.status_id,
-                a.username AS admin
+            SELECT o.id_orders, o.status_id, a.username as admin_name
             FROM orders o
             LEFT JOIN users a ON o.accepted_by = a.id_users
             WHERE o.id_user = %s
-        """, (id_user,))
+        """, (user_id,))
         return cursor.fetchall()
 
 def get_users_with_messages():
@@ -302,6 +299,38 @@ def login():
     else:
         return redirect(url_for('index'))
 
+@app.before_request
+def check_request_status_changes():
+    if 'username' in session and request.endpoint != 'login' and not request.endpoint.startswith('static'):
+        role = session.get('role')
+        user_id = get_id_user(session['username'])
+
+        if role == 'user':
+            current_statuses = get_user_status_changes(user_id)
+            previous_statuses = session.get('status_cache', {})
+            for order in current_statuses:
+                prev = previous_statuses.get(order['id_orders'])
+                now = order['status_id']
+                if prev and prev != now:
+                    admin = order['admin_name'] or "Администратор"
+                    if now == get_status_id_by_name("Принята"):
+                        flash(f"Ваша заявка №{order['id_orders']} была принята ({admin})", "success")
+                    elif now == get_status_id_by_name("Отклонена"):
+                        flash(f"Ваша заявка №{order['id_orders']} была отклонена ({admin})", "danger")
+            session['status_cache'] = {o['id_orders']: o['status_id'] for o in current_statuses}
+
+        elif role == 'admin':
+            with connect_to_database() as db:
+                cursor = db.cursor(dictionary=True)
+                cursor.execute("""
+                    SELECT o.id_orders, u.username
+                    FROM orders o
+                    JOIN users u ON o.id_user = u.id_users
+                    WHERE o.status_id = %s AND o.accepted_by = %s
+                """, (get_status_id_by_name("Завершена"), user_id))
+                confirmed = cursor.fetchall()
+                for order in confirmed:
+                    flash(f"Пользователь {order['username']} подтвердил выполнение заявки №{order['id_orders']}", "info")
 
 
 @app.route('/profile')
@@ -314,20 +343,6 @@ def profile():
         messages = get_conversation(id_user)
         all_requests_count = get_all_requests_count(id_user)
         completed_requests_counts = get_completed_requests_counts(id_user)
-        current_statuses = get_user_status_changes(id_user)
-        previous_statuses = session.get('status_cache', {})
-
-        for order in current_statuses:
-            prev = previous_statuses.get(order['id_orders'])
-            now = order['status_id']
-            if prev and prev != now:
-                admin = order['admin'] or "Администратор"
-                if now == get_status_id_by_name("Принята"):
-                    flash(f"Ваша заявка №{order['id_orders']} была принята : ({admin})", "success")
-                elif now == get_status_id_by_name("Отклонена"):
-                    flash(f"Ваша заявка №{order['id_orders']} была отклонена : ({admin})", "danger")
-        
-        session['status_cache'] = {o['id_orders']: o['status_id'] for o in current_statuses}
 
         if role == 'admin':
             requests = get_requests_by_status(status="В обработке")
