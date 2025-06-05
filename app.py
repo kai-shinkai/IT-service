@@ -220,16 +220,18 @@ def get_conversation(user_id):
         """, (user_id, user_id))
         return cursor.fetchall()
     
-def get_user_status_changes(user_id):
+def get_user_status_changes(id_user):
     with connect_to_database() as db:
         cursor = db.cursor(dictionary=True)
         cursor.execute("""
-            SELECT o.id_orders, o.status_id, o.accepted_by, u.username AS admin_name
+            SELECT 
+                o.id_orders, 
+                o.status_id,
+                a.username AS admin
             FROM orders o
-            LEFT JOIN users u ON o.accepted_by = u.id_users
+            LEFT JOIN users a ON o.accepted_by = a.id_users
             WHERE o.id_user = %s
-            ORDER BY o.data DESC
-        """, (user_id,))
+        """, (id_user,))
         return cursor.fetchall()
 
 def get_users_with_messages():
