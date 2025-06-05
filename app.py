@@ -306,31 +306,40 @@ def check_request_status_changes():
         user_id = get_id_user(session['username'])
 
         if role == 'user':
-            current_statuses = get_user_status_changes(user_id)
-            previous_statuses = session.get('status_cache', {})
-            for order in current_statuses:
-                prev = previous_statuses.get(order['id_orders'])
-                now = order['status_id']
-                if prev and prev != now:
-                    admin = order['admin_name'] or "Администратор"
-                    if now == get_status_id_by_name("Принята"):
-                        flash(f"Ваша заявка №{order['id_orders']} была принята ({admin})", "success")
-                    elif now == get_status_id_by_name("Отклонена"):
-                        flash(f"Ваша заявка №{order['id_orders']} была отклонена ({admin})", "danger")
-            session['status_cache'] = {o['id_orders']: o['status_id'] for o in current_statuses}
+            try:
+                current_statuses = get_user_status_changes(user_id)
+                previous_statuses = session.get('status_cache', {})
+
+                for order in current_statuses:
+                    prev = previous_statuses.get(order['id_orders'])
+                    now = order['status_id']
+                    if prev and prev != now:
+                        admin = order['admin_name'] or "Администратор"
+                        if now == get_status_id_by_name("Принята"):
+                            flash(f"Ваша заявка №{order['id_orders']} была принята ({admin})", "success")
+                        elif now == get_status_id_by_name("Отклонена"):
+                            flash(f"Ваша заявка №{order['id_orders']} была отклонена ({admin})", "danger")
+
+                session['status_cache'] = {o['id_orders']: o['status_id'] for o in current_statuses}
+            except Exception as e:
+                print("Ошибка в статусах заявок пользователя:", e)
 
         elif role == 'admin':
-            with connect_to_database() as db:
-                cursor = db.cursor(dictionary=True)
-                cursor.execute("""
-                    SELECT o.id_orders, u.username
-                    FROM orders o
-                    JOIN users u ON o.id_user = u.id_users
-                    WHERE o.status_id = %s AND o.accepted_by = %s
-                """, (get_status_id_by_name("Завершена"), user_id))
-                confirmed = cursor.fetchall()
-                for order in confirmed:
-                    flash(f"Пользователь {order['username']} подтвердил выполнение заявки №{order['id_orders']}", "info")
+            try:
+                with connect_to_database() as db:
+                    cursor = db.cursor(dictionary=True)
+                    cursor.execute("""
+                        SELECT o.id_orders, u.username
+                        FROM orders o
+                        JOIN users u ON o.id_user = u.id_users
+                        WHERE o.status_id = %s AND o.accepted_by = %s
+                    """, (get_status_id_by_name("Завершена"), user_id))
+                    confirmed = cursor.fetchall()
+                    for order in confirmed:
+                        flash(f"Пользователь {order['username']} подтвердил выполнение заявки №{order['id_orders']}", "info")
+            except Exception as e:
+                print("Ошибка уведомлений для администратора:", e)
+
 
 
 @app.route('/profile')
