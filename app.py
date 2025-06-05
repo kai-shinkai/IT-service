@@ -220,15 +220,15 @@ def get_conversation(user_id):
         """, (user_id, user_id))
         return cursor.fetchall()
     
-def get_user_status_changes(user_id):
+def get_user_status_changes(id_user):
     with connect_to_database() as db:
         cursor = db.cursor(dictionary=True)
         cursor.execute("""
-            SELECT o.id_orders, o.status_id, a.username as admin_name
+            SELECT o.id_orders, o.status_id, u.username AS admin_name
             FROM orders o
-            LEFT JOIN users a ON o.accepted_by = a.id_users
+            LEFT JOIN users u ON o.accepted_by = u.id_users
             WHERE o.id_user = %s
-        """, (user_id,))
+        """, (id_user,))
         return cursor.fetchall()
 
 def get_users_with_messages():
@@ -300,45 +300,57 @@ def login():
         return redirect(url_for('index'))
 
 @app.before_request
-def check_request_status_changes():
-    if 'username' in session and request.endpoint != 'login' and not request.endpoint.startswith('static'):
-        role = session.get('role')
-        user_id = get_id_user(session['username'])
+def track_status_changes():
+    if 'username' not in session:
+        return
 
-        if role == 'user':
-            try:
-                current_statuses = get_user_status_changes(user_id)
-                previous_statuses = session.get('status_cache', {})
+    endpoint = request.endpoint or ''
+    if endpoint == 'login' or endpoint.startswith('static'):
+        return
 
-                for order in current_statuses:
-                    prev = previous_statuses.get(order['id_orders'])
-                    now = order['status_id']
-                    if prev and prev != now:
-                        admin = order['admin_name'] or "Администратор"
-                        if now == get_status_id_by_name("Принята"):
-                            flash(f"Ваша заявка №{order['id_orders']} была принята ({admin})", "success")
-                        elif now == get_status_id_by_name("Отклонена"):
-                            flash(f"Ваша заявка №{order['id_orders']} была отклонена ({admin})", "danger")
+    role = session.get('role')
+    user_id = get_id_user(session['username'])
 
-                session['status_cache'] = {o['id_orders']: o['status_id'] for o in current_statuses}
-            except Exception as e:
-                print("Ошибка в статусах заявок пользователя:", e)
+    if role == 'user':
+        current = get_user_status_changes(user_id)
+        prev = session.get('status_cache', {})
 
-        elif role == 'admin':
-            try:
-                with connect_to_database() as db:
-                    cursor = db.cursor(dictionary=True)
-                    cursor.execute("""
-                        SELECT o.id_orders, u.username
-                        FROM orders o
-                        JOIN users u ON o.id_user = u.id_users
-                        WHERE o.status_id = %s AND o.accepted_by = %s
-                    """, (get_status_id_by_name("Завершена"), user_id))
-                    confirmed = cursor.fetchall()
-                    for order in confirmed:
-                        flash(f"Пользователь {order['username']} подтвердил выполнение заявки №{order['id_orders']}", "info")
-            except Exception as e:
-                print("Ошибка уведомлений для администратора:", e)
+        for order in current:
+            oid = order['id_orders']
+            new_status = order['status_id']
+            old_status = prev.get(oid)
+
+            if old_status and old_status != new_status:
+                admin_name = order.get('admin_name') or 'Администратор'
+                if new_status == get_status_id_by_name("Принята"):
+                    flash(f"Ваша заявка №{oid} была принята ({admin_name})", "success")
+                elif new_status == get_status_id_by_name("Отклонена"):
+                    flash(f"Ваша заявка №{oid} была отклонена ({admin_name})", "danger")
+
+        session['status_cache'] = {o['id_orders']: o['status_id'] for o in current}
+
+    elif role == 'admin':
+        confirmed_cache = session.get('confirmed_orders', set())
+        confirmed_cache = set(confirmed_cache)  
+
+        with connect_to_database() as db:
+            cursor = db.cursor(dictionary=True)
+            cursor.execute("""
+                SELECT o.id_orders, u.username
+                FROM orders o
+                JOIN users u ON o.id_user = u.id_users
+                WHERE o.status_id = %s
+            """, (get_status_id_by_name("Завершена"),))
+            confirmed = cursor.fetchall()
+
+        new_confirmed = set()
+        for order in confirmed:
+            oid = order['id_orders']
+            new_confirmed.add(oid)
+            if oid not in confirmed_cache:
+                flash(f"Пользователь {order['username']} подтвердил выполнение заявки №{oid}", "info")
+
+        session['confirmed_orders'] = list(new_confirmed)
 
 
 
