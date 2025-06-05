@@ -352,6 +352,10 @@ def profile():
         messages = get_conversation(id_user)
         all_requests_count = get_all_requests_count(id_user)
         completed_requests_counts = get_completed_requests_counts(id_user)
+        status_processing = get_status_id_by_name("В обработке")
+        status_accepted = get_status_id_by_name("Принята")
+        status_rejected = get_status_id_by_name("Отклонена")
+        status_completed = get_status_id_by_name("Завершена")
 
         if role == 'admin':
             requests = get_requests_by_status(status="В обработке")
@@ -371,15 +375,8 @@ def profile():
         else:
             all_requests = get_requests_by_status(id_user)
 
-            requests = [req for req in all_requests if req['status_id'] in [
-                get_status_id_by_name("В обработке"), 
-                get_status_id_by_name("Принята")
-            ]]
-
-            history_requests = [req for req in all_requests if req['status_id'] in [
-                get_status_id_by_name("Завершена"), 
-                get_status_id_by_name("Отклонена")
-            ]]
+            requests = [req for req in all_requests if req['status_id'] in [status_processing, status_accepted]]
+            history_requests = [req for req in all_requests if req['status_id'] in [status_completed, status_rejected]]
 
             return render_template('user.html', 
                                    username=session['username'], 
