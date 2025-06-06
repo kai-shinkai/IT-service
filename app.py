@@ -305,18 +305,18 @@ def track_status_changes():
         return
 
     endpoint = request.endpoint or ''
-    if endpoint in ['login', 'static'] or endpoint.startswith('static'):
+    if endpoint == 'login' or endpoint.startswith('static'):
         return
 
     role = session.get('role')
     user_id = get_id_user(session['username'])
 
-    status_cache = session.get('status_cache', {})
-
     with connect_to_database() as db:
         cursor = db.cursor(dictionary=True)
 
         if role == 'user':
+            status_cache = {int(k): v for k, v in session.get('status_cache', {}).items()}
+
             cursor.execute("""
                 SELECT o.id_orders, o.status_id, u.username AS admin_name
                 FROM orders o
@@ -329,7 +329,7 @@ def track_status_changes():
             for order in results:
                 oid = order['id_orders']
                 current_status = order['status_id']
-                previous_status = status_cache.get(str(oid))
+                previous_status = status_cache.get(oid)
 
                 if previous_status and current_status != previous_status:
                     admin = order['admin_name'] or "Администратор"
@@ -338,7 +338,8 @@ def track_status_changes():
                     elif current_status == get_status_id_by_name("Отклонена"):
                         flash(f"Ваша заявка №{oid} была отклонена ({admin})", "danger")
 
-                updated_cache[str(oid)] = current_status
+                updated_cache[oid] = current_status
+
             session['status_cache'] = updated_cache
 
         elif role == 'admin':
@@ -360,6 +361,7 @@ def track_status_changes():
                     flash(f"Пользователь {order['username']} подтвердил выполнение заявки №{oid}", "info")
 
             session['confirmed_orders'] = list(new_cache)
+
 
 
 
