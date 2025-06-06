@@ -219,7 +219,52 @@ def get_conversation(user_id):
             ORDER BY m.timestamp
         """, (user_id, user_id))
         return cursor.fetchall()
-    
+
+def add_notification(user_id, message, category="info"):
+    with connect_to_database() as db:
+        cursor = db.cursor()
+        cursor.execute("""
+            INSERT INTO notifications (user_id, message, category)
+            VALUES (%s, %s, %s)
+        """, (user_id, message, category))
+        db.commit()
+
+def confirm_order_completion(id_orders, id_user):
+    with connect_to_database() as db:
+        cursor = db.cursor()
+        status_id = get_status_id_by_name("Завершена")
+        cursor.execute("""
+            UPDATE orders SET status_id = %s WHERE id_orders = %s AND id_user = %s
+        """, (status_id, id_orders, id_user))
+
+        cursor.execute("SELECT accepted_by FROM orders WHERE id_orders = %s", (id_orders,))
+        result = cursor.fetchone()
+        if result and result[0]:
+            admin_id = result[0]
+            user_name = session.get('username', 'Пользователь')
+            message = f"Пользователь {user_name} подтвердил выполнение заявки №{id_orders}"
+            add_notification(admin_id, message, "info")
+
+        db.commit()
+
+def accept_order(order_id, admin_id):
+    with connect_to_database() as db:
+        cursor = db.cursor()
+        status_id = get_status_id_by_name("Принята")
+        cursor.execute("""
+            UPDATE orders SET status_id = %s, accepted_by = %s WHERE id_orders = %s
+        """, (status_id, admin_id, order_id))
+
+        cursor.execute("SELECT id_user FROM orders WHERE id_orders = %s", (order_id,))
+        result = cursor.fetchone()
+        if result:
+            user_id = result[0]
+            admin_name = session.get('username', 'Администратор')
+            message = f"Ваша заявка №{order_id} была принята ({admin_name})"
+            add_notification(user_id, message, "success")
+
+        db.commit()
+
 def get_user_status_changes(id_user):
     with connect_to_database() as db:
         cursor = db.cursor(dictionary=True)
@@ -300,67 +345,30 @@ def login():
         return redirect(url_for('index'))
 
 @app.before_request
-def track_status_changes():
-    if 'username' not in session:
+def check_new_notifications():
+    if 'username' not in session or request.endpoint == 'login':
         return
 
-    endpoint = request.endpoint or ''
-    if endpoint == 'login' or endpoint.startswith('static'):
-        return
-
-    role = session.get('role')
     user_id = get_id_user(session['username'])
 
     with connect_to_database() as db:
         cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT id, message, category FROM notifications
+            WHERE user_id = %s AND is_seen = 0
+        """, (user_id,))
+        notifs = cursor.fetchall()
 
-        if role == 'user':
-            status_cache = {int(k): v for k, v in session.get('status_cache', {}).items()}
+        for n in notifs:
+            flash(n['message'], n['category'])
 
-            cursor.execute("""
-                SELECT o.id_orders, o.status_id, u.username AS admin_name
-                FROM orders o
-                LEFT JOIN users u ON o.accepted_by = u.id_users
-                WHERE o.id_user = %s
-            """, (user_id,))
-            results = cursor.fetchall()
-
-            updated_cache = {}
-            for order in results:
-                oid = order['id_orders']
-                current_status = order['status_id']
-                previous_status = status_cache.get(oid)
-
-                if previous_status and current_status != previous_status:
-                    admin = order['admin_name'] or "Администратор"
-                    if current_status == get_status_id_by_name("Принята"):
-                        flash(f"Ваша заявка №{oid} была принята ({admin})", "success")
-                    elif current_status == get_status_id_by_name("Отклонена"):
-                        flash(f"Ваша заявка №{oid} была отклонена ({admin})", "danger")
-
-                updated_cache[oid] = current_status
-
-            session['status_cache'] = updated_cache
-
-        elif role == 'admin':
-            confirmed_cache = set(session.get('confirmed_orders', []))
-
-            cursor.execute("""
-                SELECT o.id_orders, u.username
-                FROM orders o
-                JOIN users u ON o.id_user = u.id_users
-                WHERE o.status_id = %s
-            """, (get_status_id_by_name("Завершена"),))
-            confirmed = cursor.fetchall()
-
-            new_cache = set()
-            for order in confirmed:
-                oid = order['id_orders']
-                new_cache.add(oid)
-                if oid not in confirmed_cache:
-                    flash(f"Пользователь {order['username']} подтвердил выполнение заявки №{oid}", "info")
-
-            session['confirmed_orders'] = list(new_cache)
+        if notifs:
+            ids = tuple(n['id'] for n in notifs)
+            cursor.execute(f"""
+                UPDATE notifications SET is_seen = 1
+                WHERE id IN ({','.join(['%s'] * len(ids))})
+            """, ids)
+            db.commit()
 
 
 
