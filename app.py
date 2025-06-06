@@ -148,14 +148,6 @@ def get_completed_requests_counts(id_user):
         result = cursor.fetchone()
         return result[0] if result else 0
 
-def accept_order(order_id, accepted_by):
-    with connect_to_database() as mydb:
-        cursor = mydb.cursor()
-        status_id = get_status_id_by_name("Принята")
-        sql = "UPDATE orders SET status_id = %s, accepted_by = %s WHERE id_orders = %s"
-        cursor.execute(sql, (status_id, accepted_by, order_id))
-        mydb.commit()
-
 def get_user_role(username):
     with connect_to_database() as mydb:
         cursor = mydb.cursor()
@@ -185,12 +177,20 @@ def update_order_status(order_id, new_status):
         mydb.commit()
 
 def reject_order(order_id):
-    with connect_to_database() as mydb:
-        cursor = mydb.cursor()
+    with connect_to_database() as db:
+        cursor = db.cursor()
         status_id = get_status_id_by_name("Отклонена")
-        sql = "UPDATE orders SET status_id = %s WHERE id_orders = %s"
-        cursor.execute(sql, (status_id, order_id))
-        mydb.commit()
+        cursor.execute("UPDATE orders SET status_id = %s WHERE id_orders = %s", (status_id, order_id))
+
+        cursor.execute("SELECT id_user FROM orders WHERE id_orders = %s", (order_id,))
+        result = cursor.fetchone()
+        if result:
+            user_id = result[0]
+            admin_name = session.get('username', 'Администратор')
+            message = f"Ваша заявка №{order_id} была отклонена ({admin_name})"
+            add_notification(user_id, message, "danger")
+
+        db.commit()
 
 def get_faq():
     with connect_to_database() as db:
