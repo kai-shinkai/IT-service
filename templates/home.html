@@ -78,7 +78,6 @@
             Часто задаваемые вопросы:
         </p>
         <div id="faqBlock">
-            <hr>
             {% for f in faq %}
                 <div class="faq-question" onclick="toggleAnswer('{{ f.id_faq }}')">{{ f.question }}</div>
                 <div class="faq-answer" id="answer-{{ f.id_faq }}">{{ f.answer }}</div>
