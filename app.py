@@ -434,12 +434,12 @@ def generate_report():
     with connect_to_database() as db:
         cursor = db.cursor(dictionary=True)
         cursor.execute("""
-            SELECT o.id_orders, o.place, o.orders_disc, o.data, u.username AS user, s.name AS status
+            SELECT o.id_orders, o.place, o.orders_disc, o.data, u.username, s.status_name
             FROM orders o
-            JOIN users u ON o.id_user = u.id_users
             JOIN status s ON o.status_id = s.id_status
-            WHERE s.name = 'Завершена'
-        """)
+            JOIN users u ON o.id_user = u.id_users
+            WHERE o.status_id = %s
+        """, (get_status_id_by_name("Завершена"),))
         rows = cursor.fetchall()
 
     wb = Workbook()
@@ -454,8 +454,8 @@ def generate_report():
             row["place"],
             row["orders_disc"],
             row["data"].strftime("%Y-%m-%d %H:%M:%S"),
-            row["user"],
-            row["status"]
+            row["username"],
+            row["status_name"]
         ])
 
     file_stream = io.BytesIO()
