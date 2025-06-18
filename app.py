@@ -1,5 +1,6 @@
-import mysql.connector
-from flask import Flask, redirect, url_for, render_template, request, session, flash
+import mysql.connector, io
+from openpyxl import Workbook
+from flask import Flask, redirect, url_for, render_template, request, session, flash, send_file
 from datetime import datetime
 
 def connect_to_database():
@@ -423,6 +424,49 @@ def profile():
     else:
         flash("Пользователь не авторизован", "warning")
         return redirect(url_for('index'))
+
+@app.route('/generate_report')
+def generate_report():
+    if 'username' not in session or get_user_role(session['username']) != 'admin':
+        flash("Доступ запрещён", "danger")
+        return redirect(url_for('profile'))
+
+    with connect_to_database() as db:
+        cursor = db.cursor(dictionary=True)
+        cursor.execute("""
+            SELECT o.id_orders, o.place, o.orders_disc, o.data, u.username AS user, s.name AS status
+            FROM orders o
+            JOIN users u ON o.id_user = u.id_users
+            JOIN status s ON o.status_id = s.id_status
+            WHERE s.name = 'Завершена'
+        """)
+        rows = cursor.fetchall()
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Завершённые заявки"
+
+    ws.append(["ID заявки", "Место", "Описание", "Дата", "Пользователь", "Статус"])
+
+    for row in rows:
+        ws.append([
+            row["id_orders"],
+            row["place"],
+            row["orders_disc"],
+            row["data"].strftime("%Y-%m-%d %H:%M:%S"),
+            row["user"],
+            row["status"]
+        ])
+
+    file_stream = io.BytesIO()
+    wb.save(file_stream)
+    file_stream.seek(0)
+    return send_file(
+        file_stream,
+        as_attachment=True,
+        download_name="completed_orders_report.xlsx",
+        mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 @app.route('/update_status', methods=['POST'])
 def update_status():

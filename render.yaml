@@ -1,8 +1,8 @@
 services:
   - type: web
-    name: flask-crm
+    name: it-service
     env: python
-    buildCommand: ""
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app
     envVars:
       - key: FLASK_ENV

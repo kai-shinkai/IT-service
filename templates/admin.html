@@ -51,6 +51,7 @@
                    <a href="{{ url_for('messages') }}" class="btn btn-primary rounded-pill">Сообщения</a>
                 </div>
                 <div class="col text-end"> 
+                    <a href="{{ url_for('generate_report') }}" class="btn btn-primary rounded-pill"><i class="bi bi-file-earmark-excel"></i> Создать отчёт</a>
                     <a href="{{ url_for('toggle_theme') }}" class="btn btn-outline-secondary rounded-circle">
                         {% if theme == 'dark' %}
                             <i class="bi bi-sun-fill"></i>
